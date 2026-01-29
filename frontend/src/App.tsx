@@ -31,16 +31,8 @@ export async function getInitialState(): Promise<{
   const fetchUserInfo = async () => {
     try {
       const user = await getCurrentUser();
-      // 转换为 API.CurrentUser 格式
-      return {
-        name: user.username,
-        avatar: 'https://gw.alipayobjects.com/zos/antfincdn/XAosXuNZyF/BiazfanxmamNRoxxVxka.png',
-        userid: user.id.toString(),
-        email: `${user.username}@example.com`,
-        signature: '后台管理系统用户',
-        title: '用户',
-        group: '用户组',
-      } as API.CurrentUser;
+      console.log('👤 获取到的用户信息:', user);
+      return user;
     } catch (_error) {
       history.push(loginPath);
     }
@@ -77,14 +69,10 @@ export const layout: RunTimeLayoutConfig = ({
       <SelectLang key="SelectLang" />,
     ],
     avatarProps: {
-      src: initialState?.currentUser?.avatar,
       title: <AvatarName />,
       render: (_, avatarChildren) => {
         return <AvatarDropdown>{avatarChildren}</AvatarDropdown>;
       },
-    },
-    waterMarkProps: {
-      content: initialState?.currentUser?.name,
     },
     footerRender: () => <Footer />,
     onPageChange: () => {
