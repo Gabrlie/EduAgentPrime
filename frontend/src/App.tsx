@@ -9,9 +9,9 @@ import {
   AvatarName,
   Footer,
   Question,
-  SelectLang,
 } from '@/components';
 import { getCurrentUser } from '@/services/auth';
+import { getCourseList } from '@/services/course';
 import defaultSettings from '../config/defaultSettings';
 import { errorConfig } from './requestErrorConfig';
 import '@ant-design/v5-patch-for-react-19';
@@ -64,10 +64,7 @@ export const layout: RunTimeLayoutConfig = ({
   setInitialState,
 }) => {
   return {
-    actionsRender: () => [
-      <Question key="doc" />,
-      <SelectLang key="SelectLang" />,
-    ],
+    actionsRender: () => [],
     avatarProps: {
       title: <AvatarName />,
       render: (_, avatarChildren) => {
@@ -102,15 +99,45 @@ export const layout: RunTimeLayoutConfig = ({
         width: '331px',
       },
     ],
-    links: isDev
-      ? [
-        <Link key="openapi" to="/umi/plugin/openapi" target="_blank">
-          <LinkOutlined />
-          <span>OpenAPI 文档</span>
-        </Link>,
-      ]
-      : [],
+    links: [],
     menuHeaderRender: undefined,
+    menu: {
+      request: async (params, defaultMenuData) => {
+        try {
+          // 获取课程列表
+          const courses = await getCourseList({ page: 1, page_size: 100 });
+          console.log('📚 加载到的课程:', courses.items);
+
+          // 找到课程管理菜单项
+          const menus = defaultMenuData.map((item) => {
+            if (item.path === '/courses') {
+              // 为课程管理添加子菜单
+              const courseMenus = courses.items.map((course) => ({
+                path: `/courses/${course.id}`,
+                name: course.name,
+                locale: false, // 禁用国际化，直接显示name
+              }));
+
+              console.log('✅ 动态课程菜单:', courseMenus);
+
+              return {
+                ...item,
+                children: [
+                  ...(item.children || []).filter(child => !child.hideInMenu),
+                  ...courseMenus,
+                ],
+              };
+            }
+            return item;
+          });
+
+          return menus;
+        } catch (error) {
+          console.error('❌ 加载课程菜单失败:', error);
+          return defaultMenuData;
+        }
+      },
+    },
     // 自定义 403 页面
     // unAccessible: <div>unAccessible</div>,
     // 增加一个 loading 的状态
@@ -145,6 +172,7 @@ export const layout: RunTimeLayoutConfig = ({
  * @doc https://umijs.org/docs/max/request#配置
  */
 export const request: RequestConfig = {
-  baseURL: 'https://proapi.azurewebsites.net',
+  // 注释掉 baseURL，使用 proxy 配置代理到本地后端
+  // baseURL: 'https://proapi.azurewebsites.net',
   ...errorConfig,
 };

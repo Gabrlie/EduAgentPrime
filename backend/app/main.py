@@ -2,14 +2,23 @@
 FastAPI 应用主入口
 """
 from datetime import timedelta
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from typing import Optional
+from fastapi import FastAPI, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.orm import Session
+import os
+import uuid
+import shutil
 
 from .models import (
     Token, LoginRequest, UserResponse, User, Message,
     ChangePasswordRequest, UserSettingsRequest, ChatMessageRequest,
-    MessageResponse
+    MessageResponse,
+    Course, CourseDocument, calculate_semester,
+    CourseCreateRequest, CourseUpdateRequest, CourseResponse,
+    DocumentCreateRequest, DocumentUpdateRequest, DocumentResponse,
+    CourseWithDocumentsResponse
 )
 from .database import get_db
 from .auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -432,4 +441,505 @@ async def root():
         "message": "BZYAgent API",
         "docs": "/docs"
     }
+
+
+# ==================== 课程管理 API ====================
+
+@app.post("/api/courses", response_model=CourseResponse, tags=["课程管理"])
+async def create_course(
+    request: Request,
+    course_data: CourseCreateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    创建课程
+    
+    - 如果未提供学期，将自动根据当前日期计算
+    - 所有教材信息字段必填
+    """
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    # 如果没有提供学期，使用自动计算的值
+    semester = course_data.semester if course_data.semester else calculate_semester()
+    
+    # 创建课程
+    course = Course(
+        user_id=user.id,
+        name=course_data.name,
+        semester=semester,
+        class_name=course_data.class_name,
+        total_hours=course_data.total_hours,
+        practice_hours=course_data.practice_hours,
+        course_type=course_data.course_type,
+        textbook_isbn=course_data.textbook_isbn,
+        textbook_name=course_data.textbook_name,
+        textbook_image=course_data.textbook_image,
+        textbook_publisher=course_data.textbook_publisher,
+        textbook_link=course_data.textbook_link,
+        course_catalog=course_data.course_catalog
+    )
+    
+    db.add(course)
+    db.commit()
+    db.refresh(course)
+    
+    return course
+
+
+@app.get("/api/courses", response_model=list[CourseResponse], tags=["课程管理"])
+async def get_courses(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    获取当前用户的所有课程列表
+    
+    按创建时间倒序排列
+    """
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    courses = db.query(Course).filter(
+        Course.user_id == user.id
+    ).order_by(Course.created_at.desc()).all()
+    
+    return courses
+
+
+@app.get("/api/courses/{course_id}", response_model=CourseWithDocumentsResponse, tags=["课程管理"])
+async def get_course(
+    course_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    获取单个课程详情，包含所有文档
+    """
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    # 获取课程的所有文档
+    documents = db.query(CourseDocument).filter(
+        CourseDocument.course_id == course_id
+    ).order_by(CourseDocument.created_at.desc()).all()
+    
+    return {
+        "course": course,
+        "documents": documents
+    }
+
+
+@app.put("/api/courses/{course_id}", response_model=CourseResponse, tags=["课程管理"])
+async def update_course(
+    course_id: int,
+    request: Request,
+    course_data: CourseUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    更新课程信息
+    
+    只更新提供的字段，未提供的字段保持不变
+    """
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    # 更新字段
+    update_data = course_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(course, field, value)
+    
+    db.commit()
+    db.refresh(course)
+    
+    return course
+
+
+@app.delete("/api/courses/{course_id}", tags=["课程管理"])
+async def delete_course(
+    course_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    删除课程
+    
+    会级联删除该课程下的所有文档
+    """
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    db.delete(course)
+    db.commit()
+    
+    return {"message": "课程删除成功"}
+
+
+# ==================== 文档管理 API ====================
+
+@app.post("/api/courses/{course_id}/documents", response_model=DocumentResponse, tags=["文档管理"])
+async def create_document(
+    course_id: int,
+    request: Request,
+    document_data: DocumentCreateRequest,
+    db: Session = Depends(get_db)
+):
+    """创建文档 - 支持 AI 生成或上传文件"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    document = CourseDocument(
+        course_id=course_id,
+        doc_type=document_data.doc_type,
+        title=document_data.title,
+        content=document_data.content,
+        file_url=document_data.file_url,
+        lesson_number=document_data.lesson_number
+    )
+    
+    try:
+        db.add(document)
+        db.commit()
+        db.refresh(document)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"文档创建失败：{str(e)}")
+    
+    return document
+
+
+@app.post("/api/courses/{course_id}/documents/upload", tags=["文档管理"])
+async def upload_document(
+    course_id: int,
+    request: Request,
+    file: UploadFile = File(...),
+    doc_type: str = File(...),
+    title: str = File(...),
+    lesson_number: Optional[int] = File(None),
+    db: Session = Depends(get_db)
+):
+    """上传文档文件 - 支持 .docx, .pdf, .pptx, .md，最大 10MB"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    # 验证文件类型
+    allowed_extensions = [".docx", ".pdf", ".pptx", ".md"]
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型，仅支持：{', '.join(allowed_extensions)}"
+        )
+    
+    # 验证文件大小（10MB）
+    file.file.seek(0, 2)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    
+    if file_size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="文件大小不能超过 10MB")
+    
+    # 创建上传目录
+    upload_dir = f"backend/uploads/courses/{course_id}/documents"
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    # 生成唯一文件名
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = os.path.join(upload_dir, unique_filename)
+    
+    # 保存文件
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # 创建文档记录
+    document = CourseDocument(
+        course_id=course_id,
+        doc_type=doc_type,
+        title=title,
+        file_url=f"/api/documents/files/{course_id}/{unique_filename}",
+        lesson_number=lesson_number
+    )
+    
+    try:
+        db.add(document)
+        db.commit()
+        db.refresh(document)
+    except Exception as e:
+        db.rollback()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=400, detail=f"文档创建失败：{str(e)}")
+    
+    return {"message": "文件上传成功", "document": document}
+
+
+@app.get("/api/courses/{course_id}/documents", response_model=list[DocumentResponse], tags=["文档管理"])
+async def get_documents(
+    course_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """获取课程的所有文档列表"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    documents = db.query(CourseDocument).filter(
+        CourseDocument.course_id == course_id
+    ).order_by(CourseDocument.doc_type, CourseDocument.lesson_number).all()
+    
+    return documents
+
+
+@app.get("/api/courses/{course_id}/documents/type/{doc_type}", response_model=list[DocumentResponse], tags=["文档管理"])
+async def get_documents_by_type(
+    course_id: int,
+    doc_type: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """获取指定类型的文档列表"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    
+    documents = db.query(CourseDocument).filter(
+        CourseDocument.course_id == course_id,
+        CourseDocument.doc_type == doc_type
+    ).order_by(CourseDocument.lesson_number).all()
+    
+    return documents
+
+
+@app.get("/api/documents/{document_id}", response_model=DocumentResponse, tags=["文档管理"])
+async def get_document(
+    document_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """获取单个文档详情"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    document = db.query(CourseDocument).filter(
+        CourseDocument.id == document_id
+    ).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == document.course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=403, detail="无权访问此文档")
+    
+    return document
+
+
+@app.put("/api/documents/{document_id}", response_model=DocumentResponse, tags=["文档管理"])
+async def update_document(
+    document_id: int,
+    request: Request,
+    document_data: DocumentUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """更新文档信息"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    document = db.query(CourseDocument).filter(
+        CourseDocument.id == document_id
+    ).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == document.course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=403, detail="无权修改此文档")
+    
+    update_data = document_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(document, field, value)
+    
+    db.commit()
+    db.refresh(document)
+    
+    return document
+
+
+@app.delete("/api/documents/{document_id}", tags=["文档管理"])
+async def delete_document(
+    document_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """删除文档 - 同时删除上传的文件"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    document = db.query(CourseDocument).filter(
+        CourseDocument.id == document_id
+    ).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == document.course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=403, detail="无权删除此文档")
+    
+    # 删除上传的文件
+    if document.file_url:
+        try:
+            parts = document.file_url.split('/')
+            if len(parts) >= 3:
+                course_id = parts[-2]
+                filename = parts[-1]
+                file_path = f"backend/uploads/courses/{course_id}/documents/{filename}"
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+        except Exception as e:
+            print(f"删除文件失败：{e}")
+    
+    db.delete(document)
+    db.commit()
+    
+    return {"message": "文档删除成功"}
+
+
+@app.get("/api/documents/files/{course_id}/{filename}", tags=["文档管理"])
+async def download_document(
+    course_id: int,
+    filename: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """下载文档文件"""
+    username = request.state.username
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    course = db.query(Course).filter(
+        Course.id == course_id,
+        Course.user_id == user.id
+    ).first()
+    
+    if not course:
+        raise HTTPException(status_code=403, detail="无权访问此文件")
+    
+    file_path = f"backend/uploads/courses/{course_id}/documents/{filename}"
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    return FileResponse(
+        file_path,
+        media_type="application/octet-stream",
+        filename=filename
+    )
 

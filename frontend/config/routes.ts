@@ -41,6 +41,36 @@ export default [
     component: './TestAI',
   },
   {
+    path: '/courses',
+    name: 'courses',
+    icon: 'book',
+    routes: [
+      {
+        path: '/courses',
+        component: './Course/List',
+        exact: true,
+      },
+      {
+        path: '/courses/create',
+        name: 'create',
+        component: './Course/Create',
+        hideInMenu: true,
+      },
+      {
+        path: '/courses/:id',
+        name: 'detail',
+        component: './Course/Detail',
+        hideInMenu: true,
+      },
+      {
+        path: '/courses/:id/edit',
+        name: 'edit',
+        component: './Course/Edit',
+        hideInMenu: true,
+      },
+    ],
+  },
+  {
     path: '/',
     redirect: '/dashboard',
   },

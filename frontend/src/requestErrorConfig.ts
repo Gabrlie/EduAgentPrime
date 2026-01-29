@@ -79,16 +79,19 @@ export const errorConfig: RequestConfig = {
             window.location.href = '/user/login';
           }
         } else {
-          message.error(`Response status:${error.response.status}`);
+          // 尝试从 FastAPI 的错误响应中提取 detail 字段
+          const detail = error.response.data?.detail;
+          const errorMsg = detail || `请求失败 (${error.response.status})`;
+          message.error(errorMsg);
         }
       } else if (error.request) {
         // 请求已经成功发起，但没有收到响应
         // \`error.request\` 在浏览器中是 XMLHttpRequest 的实例，
         // 而在node.js中是 http.ClientRequest 的实例
-        message.error('None response! Please retry.');
+        message.error('服务器无响应，请检查网络连接');
       } else {
         // 发送请求时出了点问题
-        message.error('Request error, please retry.');
+        message.error('请求错误，请重试');
       }
     },
   },

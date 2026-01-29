@@ -49,4 +49,9 @@ export default {
   'menu.editor.flow': 'Flow Editor',
   'menu.editor.mind': 'Mind Editor',
   'menu.editor.koni': 'Koni Editor',
+  'menu.testai': 'AI Diagnostics',
+  'menu.courses': 'Course Management',
+  'menu.courses.create': 'Create Course',
+  'menu.courses.detail': 'Course Details',
+  'menu.courses.edit': 'Edit Course',
 };
