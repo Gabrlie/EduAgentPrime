@@ -1,5 +1,6 @@
 ﻿import type { RequestOptions } from '@@/plugin-request/request';
 import type { RequestConfig } from '@umijs/max';
+import { history } from '@umijs/max';
 import { message, notification } from 'antd';
 
 // 错误处理方案： 错误类型
@@ -75,8 +76,8 @@ export const errorConfig: RequestConfig = {
         if (error.response.status === 401) {
           // 未授权，清除 token 并跳转到登录页
           localStorage.removeItem('token');
-          if (window.location.pathname !== '/user/login') {
-            window.location.href = '/user/login';
+          if (history.location.pathname !== '/user/login') {
+            history.push('/user/login');
           }
         } else {
           // 尝试从 FastAPI 的错误响应中提取 detail 字段
