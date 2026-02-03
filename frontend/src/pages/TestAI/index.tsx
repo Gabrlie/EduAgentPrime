@@ -21,7 +21,7 @@ const TestAI: React.FC = () => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                 },
-                body: JSON.stringify({ content: '你好' }),
+                body: JSON.stringify({ content: '你好，你是谁？' }),
             });
 
             if (!response.ok) {

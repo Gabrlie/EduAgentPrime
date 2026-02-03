@@ -11,7 +11,7 @@ import {
   Question,
 } from '@/components';
 import { getCurrentUser } from '@/services/auth';
-import { getCourseList } from '@/services/course';
+import { getCourses } from '@/services/course';
 import defaultSettings from '../config/defaultSettings';
 import { errorConfig } from './requestErrorConfig';
 import '@ant-design/v5-patch-for-react-19';
@@ -105,14 +105,14 @@ export const layout: RunTimeLayoutConfig = ({
       request: async (params, defaultMenuData) => {
         try {
           // 获取课程列表
-          const courses = await getCourseList({ page: 1, page_size: 100 });
-          console.log('📚 加载到的课程:', courses.items);
+          const courses = await getCourses();
+          console.log('📚 加载到的课程:', courses);
 
           // 找到课程管理菜单项
           const menus = defaultMenuData.map((item) => {
             if (item.path === '/courses') {
               // 为课程管理添加子菜单
-              const courseMenus = courses.items.map((course) => ({
+              const courseMenus = courses.map((course) => ({
                 path: `/courses/${course.id}`,
                 name: course.name,
                 locale: false, // 禁用国际化，直接显示name
