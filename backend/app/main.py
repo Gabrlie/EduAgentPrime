@@ -6,6 +6,7 @@ from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import os
 import uuid
@@ -43,6 +44,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 引入教案生成 API Router
+from .lesson_plan_api import router as lesson_plan_router
+app.include_router(lesson_plan_router)
+
+# 引入授课计划生成 API Router
+from .teaching_plan_api import router as teaching_plan_router
+app.include_router(teaching_plan_router)
+
+# 配置静态文件服务（用于下载生成的文档）
+uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
+if not os.path.exists(uploads_dir):
+    os.makedirs(uploads_dir, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 @app.post("/api/auth/login", response_model=Token, tags=["认证"])
@@ -699,31 +714,70 @@ async def upload_document(
     if file_size > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="文件大小不能超过 10MB")
     
-    # 创建上传目录
-    upload_dir = f"backend/uploads/courses/{course_id}/documents"
-    os.makedirs(upload_dir, exist_ok=True)
+    # 创建上传目录：授课计划使用统一目录，其他文档按课程分类
+    if doc_type == "plan":
+        # 授课计划使用与生成相同的目录
+        upload_dir = os.path.join(os.path.dirname(__file__), "..", "uploads", "generated")
+        filename = f"授课计划模板_{course_id}_uploaded{file_ext}"
+    else:
+        upload_dir = f"backend/uploads/courses/{course_id}/documents"
+        filename = f"{uuid.uuid4()}{file_ext}"
     
-    # 生成唯一文件名
-    unique_filename = f"{uuid.uuid4()}{file_ext}"
-    file_path = os.path.join(upload_dir, unique_filename)
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, filename)
+    
+    # 检查是否已有同类型文档（仅对授课计划）
+    existing_doc = None
+    if doc_type == "plan":
+        existing_doc = db.query(CourseDocument).filter(
+            CourseDocument.course_id == course_id,
+            CourseDocument.doc_type == "plan"
+        ).first()
+        
+        # 删除旧文件
+        if existing_doc and existing_doc.file_url:
+            # 从 file_url 解析出文件路径
+            old_file_path = os.path.join(
+                os.path.dirname(__file__), "..",
+                "uploads",
+                existing_doc.file_url.lstrip("/uploads/")
+            )
+            if os.path.exists(old_file_path):
+                os.remove(old_file_path)
     
     # 保存文件
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # 创建文档记录
-    document = CourseDocument(
-        course_id=course_id,
-        doc_type=doc_type,
-        title=title,
-        file_url=f"/api/documents/files/{course_id}/{unique_filename}",
-        lesson_number=lesson_number
-    )
+    # 构建 file_url：授课计划使用 /uploads/ 路径
+    if doc_type == "plan":
+        file_url = f"/uploads/generated/{filename}"
+    else:
+        file_url = f"/api/documents/files/{course_id}/{filename}"
     
+    # 创建或更新文档记录
     try:
-        db.add(document)
-        db.commit()
-        db.refresh(document)
+        if existing_doc:
+            # 更新已有记录
+            existing_doc.title = title
+            existing_doc.file_url = file_url
+            if lesson_number is not None:
+                existing_doc.lesson_number = lesson_number
+            db.commit()
+            db.refresh(existing_doc)
+            document = existing_doc
+        else:
+            # 创建新记录
+            document = CourseDocument(
+                course_id=course_id,
+                doc_type=doc_type,
+                title=title,
+                file_url=file_url,
+                lesson_number=lesson_number
+            )
+            db.add(document)
+            db.commit()
+            db.refresh(document)
     except Exception as e:
         db.rollback()
         if os.path.exists(file_path):

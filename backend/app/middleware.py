@@ -21,21 +21,26 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """处理请求"""
         # 检查是否是排除路径
-        if request.url.path in self.EXCLUDE_PATHS:
+        if request.url.path in self.EXCLUDE_PATHS or request.url.path.startswith("/uploads/"):
             return await call_next(request)
         
-        # 获取 Authorization header
+        # 获取 token：优先从 header，其次从 URL 参数（用于 SSE）
         auth_header = request.headers.get("Authorization")
+        token = None
         
-        if not auth_header or not auth_header.startswith("Bearer "):
+        if auth_header and auth_header.startswith("Bearer "):
+            # 从 header 中获取
+            token = auth_header.split(" ")[1]
+        elif "token" in request.query_params:
+            # 从 URL 参数中获取（EventSource 不支持自定义 headers）
+            token = request.query_params.get("token")
+        
+        if not token:
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 content={"detail": "未提供认证令牌"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
-        # 提取 token
-        token = auth_header.split(" ")[1]
         
         # 验证 token
         username = verify_token(token)

@@ -68,6 +68,18 @@ export default [
         component: './Course/Edit',
         hideInMenu: true,
       },
+      {
+        path: '/courses/:id/lesson-plan/generate',
+        name: 'generateLessonPlan',
+        component: './Course/LessonPlanGenerate',
+        hideInMenu: true,
+      },
+      {
+        path: '/courses/:id/teaching-plan/generate',
+        name: 'generateTeachingPlan',
+        component: './Course/TeachingPlanGenerate',
+        hideInMenu: true,
+      },
     ],
   },
   {

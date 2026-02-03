@@ -4,7 +4,7 @@
 import { ProList } from '@ant-design/pro-components';
 import { Button, message, Space, Tag } from 'antd';
 import { CloudUploadOutlined, RobotOutlined, EditOutlined, DownloadOutlined } from '@ant-design/icons';
-import { useIntl } from '@umijs/max';
+import { useIntl, useNavigate } from '@umijs/max';
 import { useEffect, useState } from 'react';
 import { getDocuments, downloadDocument, type CourseDocument } from '@/services/document';
 
@@ -16,6 +16,7 @@ const docTypes = ['standard', 'plan', 'info'];
 
 const SingleDocuments: React.FC<SingleDocumentsProps> = ({ courseId }) => {
     const intl = useIntl();
+    const navigate = useNavigate();
     const [documents, setDocuments] = useState<CourseDocument[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -43,6 +44,15 @@ const SingleDocuments: React.FC<SingleDocumentsProps> = ({ courseId }) => {
             message.success('下载成功');
         } catch (error) {
             message.error('下载失败');
+        }
+    };
+
+    const handleGenerate = (docType: string) => {
+        if (docType === 'plan') {
+            // 跳转到授课计划生成页面
+            navigate(`/courses/${courseId}/teaching-plan/generate`);
+        } else {
+            message.info('AI 生成功能开发中');
         }
     };
 
@@ -83,7 +93,7 @@ const SingleDocuments: React.FC<SingleDocumentsProps> = ({ courseId }) => {
                                 key="ai"
                                 type="link"
                                 icon={<RobotOutlined />}
-                                onClick={() => message.info('AI 生成功能开发中')}
+                                onClick={() => handleGenerate(record.docType)}
                             >
                                 {intl.formatMessage({ id: 'pages.courses.documents.generate' })}
                             </Button>,

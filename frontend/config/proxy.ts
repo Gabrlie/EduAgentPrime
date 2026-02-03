@@ -18,6 +18,12 @@ export default {
       changeOrigin: true,
       pathRewrite: { '^': '' },
     },
+    '/uploads/': {
+      // 静态文件也代理到后端
+      target: 'http://localhost:8000',
+      changeOrigin: true,
+      pathRewrite: { '^': '' },
+    },
   },
   /**
    * @name 详细的代理配置

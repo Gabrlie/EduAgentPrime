@@ -2,9 +2,9 @@
  * 多份文档管理组件 - 教案、课件
  */
 import { ProTable } from '@ant-design/pro-components';
-import { Button, message, Modal, Space } from 'antd';
+import { Button, message, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined } from '@ant-design/icons';
-import { useIntl } from '@umijs/max';
+import { useIntl, useNavigate } from '@umijs/max';
 import { useEffect, useState } from 'react';
 import { getDocumentsByType, deleteDocument, downloadDocument, type CourseDocument } from '@/services/document';
 
@@ -15,6 +15,7 @@ interface MultiDocumentsProps {
 
 const MultiDocuments: React.FC<MultiDocumentsProps> = ({ courseId, docType }) => {
     const intl = useIntl();
+    const navigate = useNavigate();
     const [documents, setDocuments] = useState<CourseDocument[]>([]);
     const [loading, setLoading] = useState(false);
 
@@ -59,6 +60,15 @@ const MultiDocuments: React.FC<MultiDocumentsProps> = ({ courseId, docType }) =>
             message.success('下载成功');
         } catch (error) {
             message.error('下载失败');
+        }
+    };
+
+    const handleCreate = () => {
+        if (docType === 'lesson') {
+            // 跳转到教案生成页面
+            navigate(`/courses/${courseId}/lesson-plan/generate`);
+        } else {
+            message.info('新建功能开发中');
         }
     };
 
@@ -132,7 +142,7 @@ const MultiDocuments: React.FC<MultiDocumentsProps> = ({ courseId, docType }) =>
                     key="create"
                     type="primary"
                     icon={<PlusOutlined />}
-                    onClick={() => message.info('新建功能开发中')}
+                    onClick={handleCreate}
                 >
                     {intl.formatMessage({ id: 'pages.courses.documents.new' })}
                 </Button>,
