@@ -55,6 +55,7 @@
 | `content` | text | 文档内容或结构化 JSON |
 | `file_url` | string | 文件下载 URL |
 | `lesson_number` | int | 课次编号（可选） |
+| `file_exists` | bool | 文件是否存在（响应字段） |
 | `created_at` | datetime | 创建时间 |
 | `updated_at` | datetime | 更新时间 |
 

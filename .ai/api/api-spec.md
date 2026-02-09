@@ -34,6 +34,7 @@
 | `GET` | `/api/courses/{course_id}/documents` | 获取课程文档列表 |
 | `GET` | `/api/courses/{course_id}/documents/type/{doc_type}` | 获取指定类型文档 |
 | `GET` | `/api/documents/{document_id}` | 获取文档详情 |
+| `GET` | `/api/documents/{document_id}/download` | 下载文档（带正确文件名） |
 | `PUT` | `/api/documents/{document_id}` | 更新文档 |
 | `DELETE` | `/api/documents/{document_id}` | 删除文档 |
 | `GET` | `/api/documents/files/{course_id}/{filename}` | 下载文档文件 |
@@ -58,7 +59,12 @@
 - 教案生成
 - `sequence` 授课顺序
 
+- 文档上传
+- `doc_type` 文档类型
+- `lesson_number` 教案上传必须指定课次
+
 ## 响应与错误处理
 - 成功响应通常为 JSON 对象或数组。
 - 失败响应遵循 FastAPI 的 `detail` 字段提示。
 - SSE 响应为 `text/event-stream`，数据体为 JSON 字符串。
+- 文档相关响应包含 `file_exists` 字段用于标记本地文件是否存在。

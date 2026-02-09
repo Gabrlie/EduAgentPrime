@@ -21,6 +21,9 @@
 3. 根据课程目录与周次框架调用 AI 生成每次课的标题与任务列表。
 4. 若 `final_review = true`，追加最后一次课为“课程复习与考核”。
 
+## 命名规则
+- 授课计划命名：`《课程名称》授课计划`。
+
 ## 关键实现位置
 - 排课与内容生成：`backend/app/teaching_plan_service.py`
 - SSE 与模板渲染：`backend/app/routers/teaching_plan_api.py`

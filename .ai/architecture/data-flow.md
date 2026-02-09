@@ -26,6 +26,8 @@ sequenceDiagram
   AI-->>BE: 教学计划 JSON
   BE->>FS: 渲染 Word 模板并保存
   BE-->>FE: SSE completed + file_url
+  FE->>BE: GET /api/courses/{id}/documents/type/plan
+  BE-->>FE: 文档列表（含 file_exists）
 ```
 
 ## 教案生成
@@ -43,6 +45,8 @@ sequenceDiagram
   BE->>FS: 渲染教案 Word 文档
   BE->>DB: 保存文档记录
   BE-->>FE: SSE completed + document_id
+  FE->>BE: GET /api/courses/{id}/documents/type/lesson
+  BE-->>FE: 文档列表（含 file_exists）
 ```
 
 ## AI 对话
