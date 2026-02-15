@@ -1,5 +1,5 @@
 import { PageContainer, ProCard, ProDescriptions } from '@ant-design/pro-components';
-import { Button, Image, message, Modal, Tabs, Input, Space, Dropdown, Checkbox, Popover } from 'antd';
+import { Button, Image, message, Modal, Tabs, Input, Space, Dropdown, Checkbox, Popover, Typography } from 'antd';
 import { EditOutlined, DeleteOutlined, ReloadOutlined, SettingOutlined, ColumnHeightOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useIntl } from '@umijs/max';
 import { useEffect, useMemo, useState } from 'react';
@@ -8,6 +8,7 @@ import SingleDocuments from './components/SingleDocuments';
 import MultiDocuments from './components/MultiDocuments';
 
 const { TextArea } = Input;
+const KIMI_SLIDES_URL = 'https://www.kimi.com/slides';
 
 const CourseDetail: React.FC = () => {
     const navigate = useNavigate();
@@ -90,6 +91,27 @@ const CourseDetail: React.FC = () => {
         }
     };
 
+    const handleCreateCourseware = () => {
+        Modal.confirm({
+            title: '课件生成未开放',
+            content: (
+                <div>
+                    <div style={{ marginBottom: 8 }}>
+                        课件生成功能尚未制作完毕，请先使用 Kimi Slides 生成课件后再上传归档。
+                    </div>
+                    <Typography.Link href={KIMI_SLIDES_URL} target="_blank" rel="noreferrer">
+                        前往 Kimi Slides
+                    </Typography.Link>
+                </div>
+            ),
+            okText: '前往 Kimi',
+            cancelText: '知道了',
+            onOk: () => {
+                window.open(KIMI_SLIDES_URL, '_blank', 'noopener,noreferrer');
+            },
+        });
+    };
+
     const densityMenu = useMemo(
         () => ({
             items: [
@@ -132,7 +154,7 @@ const CourseDetail: React.FC = () => {
                     onClick={() =>
                         isLesson
                             ? navigate(`/courses/${params.id}/lesson-plan/generate`)
-                            : message.info('新建功能开发中')
+                            : handleCreateCourseware()
                     }
                 >
                     {isLesson ? '新建教案' : '新建课件'}
@@ -191,7 +213,7 @@ const CourseDetail: React.FC = () => {
                 </Popover>
             </Space>
         );
-    }, [activeTab, columnOptions, densityMenu, message, navigate, params.id, visibleColumns]);
+    }, [activeTab, columnOptions, densityMenu, handleCreateCourseware, navigate, params.id, visibleColumns]);
 
     if (!course) {
         return <PageContainer loading={loading} />;

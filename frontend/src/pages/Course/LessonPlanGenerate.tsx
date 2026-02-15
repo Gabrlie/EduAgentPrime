@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PageContainer } from '@ant-design/pro-components';
 import { Card, Button, Form, InputNumber, message, Space, Alert, Spin, Modal } from 'antd';
-import { useParams, history, useSearchParams } from '@umijs/max';
+import { useParams, history, useSearchParams, useModel } from '@umijs/max';
 import GenerationProgressDisplay, {
     GenerationProgress,
 } from '@/components/GenerationProgress';
@@ -14,6 +14,7 @@ import { getCourseDetail } from '@/services/course';
  */
 const LessonPlanGenerate: React.FC = () => {
     const { id: courseId } = useParams<{ id: string }>();
+    const { initialState } = useModel('@@initialState');
     const [searchParams] = useSearchParams();
     const [form] = Form.useForm();
     const [generating, setGenerating] = useState(false);
@@ -23,6 +24,9 @@ const LessonPlanGenerate: React.FC = () => {
     const [teachingPlan, setTeachingPlan] = useState<any>(null);
     const [loadingCourse, setLoadingCourse] = useState(true);
     const [course, setCourse] = useState<any>(null);
+    const aiConfigured =
+        Boolean(initialState?.currentUser?.has_api_key) &&
+        Boolean(initialState?.currentUser?.ai_base_url);
 
     useEffect(() => {
         loadCourse();
@@ -101,6 +105,15 @@ const LessonPlanGenerate: React.FC = () => {
     const handleGenerate = async () => {
         if (course?.course_type === 'C') {
             message.error('C类课程教案暂未开发，请自行上传教案');
+            return;
+        }
+        if (!aiConfigured) {
+            Modal.info({
+                title: '请先配置 AI',
+                content: '生成教案需要先配置 AI Base URL 与 API Key。',
+                okText: '前往配置',
+                onOk: () => history.push('/profile'),
+            });
             return;
         }
         if (teachingPlan && !teachingPlan.content) {
@@ -198,6 +211,25 @@ const LessonPlanGenerate: React.FC = () => {
                         showIcon
                     />
                 )}
+                {!aiConfigured && course?.course_type !== 'C' && (
+                    <Alert
+                        message="未配置 AI"
+                        description={
+                            <div>
+                                <p>生成教案需要先配置 AI Base URL 与 API Key。</p>
+                                <Button
+                                    type="primary"
+                                    onClick={() => history.push('/profile')}
+                                    style={{ marginTop: 8 }}
+                                >
+                                    前往配置
+                                </Button>
+                            </div>
+                        }
+                        type="warning"
+                        showIcon
+                    />
+                )}
                 {teachingPlan && !teachingPlan.content && (
                     <Alert
                         message="授课计划为上传文档"
@@ -275,7 +307,7 @@ const LessonPlanGenerate: React.FC = () => {
                                     size="large"
                                     onClick={handleGenerate}
                                     loading={generating}
-                                    disabled={generating}
+                                    disabled={generating || !aiConfigured}
                                 >
                                     {generating ? '生成中...' : '开始生成教案'}
                                 </Button>

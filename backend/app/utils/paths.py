@@ -6,7 +6,9 @@ from typing import Union
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
-UPLOADS_DIR = BACKEND_DIR / "uploads"
+PROJECT_DIR = BACKEND_DIR.parent
+DATA_DIR = PROJECT_DIR / "data"
+UPLOADS_DIR = DATA_DIR / "uploads"
 GENERATED_DIR = UPLOADS_DIR / "generated"
 TEMPLATES_DIR = BACKEND_DIR / "templates"
 

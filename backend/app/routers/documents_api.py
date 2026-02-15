@@ -69,8 +69,11 @@ async def upload_document(
     course: Course = Depends(get_course_for_user),
     db: Session = Depends(get_db),
 ):
-    """上传文档文件 - 支持 .docx, .doc，最大 10MB"""
-    allowed_extensions = [".docx", ".doc"]
+    """上传文档文件 - 教案/授课计划支持 .docx、.doc；课件支持 .pptx、.ppt，最大 10MB"""
+    if doc_type == "courseware":
+        allowed_extensions = [".pptx", ".ppt"]
+    else:
+        allowed_extensions = [".docx", ".doc"]
     file_ext = Path(file.filename).suffix.lower()
     if file_ext not in allowed_extensions:
         raise HTTPException(

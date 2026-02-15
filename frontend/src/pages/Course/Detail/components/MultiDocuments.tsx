@@ -44,6 +44,7 @@ const MultiDocuments: React.FC<MultiDocumentsProps> = ({
     const [uploading, setUploading] = useState(false);
     const [uploadFileList, setUploadFileList] = useState<UploadFile[]>([]);
     const [uploadForm] = Form.useForm();
+    const uploadAccept = docType === 'courseware' ? '.ppt,.pptx' : '.doc,.docx';
 
     useEffect(() => {
         loadDocuments();
@@ -146,6 +147,7 @@ const MultiDocuments: React.FC<MultiDocumentsProps> = ({
                     const isMissingFile = record.file_exists === false;
                     const isUploaded = Boolean(record.file_url && !record.content);
                     const canDownload = record.file_url && !isMissingFile;
+                    const isLesson = docType === 'lesson';
 
                     if (isMissingFile) {
                         return [
@@ -177,22 +179,20 @@ const MultiDocuments: React.FC<MultiDocumentsProps> = ({
                     }
 
                     return [
-                        <Button
-                            key="edit"
-                            type="link"
-                            size="small"
-                            icon={<EditOutlined />}
-                            onClick={() => {
-                                if (docType === 'lesson') {
+                        isLesson && (
+                            <Button
+                                key="edit"
+                                type="link"
+                                size="small"
+                                icon={<EditOutlined />}
+                                onClick={() => {
                                     navigate(`/courses/${courseId}/lesson-plan/${record.id}`);
-                                    return;
-                                }
-                                message.info('编辑功能开发中');
-                            }}
-                            disabled={isUploaded}
-                        >
-                            {intl.formatMessage({ id: 'pages.courses.documents.edit' })}
-                        </Button>,
+                                }}
+                                disabled={isUploaded}
+                            >
+                                {intl.formatMessage({ id: 'pages.courses.documents.edit' })}
+                            </Button>
+                        ),
                         canDownload && (
                             <Button
                                 key="download"
@@ -357,7 +357,16 @@ const MultiDocuments: React.FC<MultiDocumentsProps> = ({
             >
                 <Form form={uploadForm} layout="vertical">
                     <Alert
-                        message="上传文档仅用于下载与查看，无法使用AI生成与编辑功能"
+                        message={
+                            docType === 'courseware'
+                                ? '课件仅支持上传归档，暂不支持生成与编辑功能'
+                                : '上传文档仅用于下载与查看，无法使用AI生成与编辑功能'
+                        }
+                        description={
+                            docType === 'courseware'
+                                ? '支持 .ppt / .pptx 格式，大小不超过 10MB'
+                                : '支持 .doc / .docx 格式，大小不超过 10MB'
+                        }
                         type="warning"
                         showIcon
                         style={{ marginBottom: 12 }}
@@ -376,7 +385,7 @@ const MultiDocuments: React.FC<MultiDocumentsProps> = ({
                             fileList={uploadFileList}
                             beforeUpload={() => false}
                             maxCount={1}
-                            accept=".doc,.docx"
+                            accept={uploadAccept}
                             onChange={({ fileList }) => setUploadFileList(fileList.slice(-1))}
                         >
                             <Button icon={<CloudUploadOutlined />}>选择文件</Button>

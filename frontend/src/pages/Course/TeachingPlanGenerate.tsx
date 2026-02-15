@@ -49,6 +49,9 @@ const TeachingPlanGenerate: React.FC = () => {
         skip_slots: [] as Array<{ week: number; class: number }>,
     });
     const [existingDoc, setExistingDoc] = useState<any>(null); // 已有文档
+    const aiConfigured =
+        Boolean(initialState?.currentUser?.has_api_key) &&
+        Boolean(initialState?.currentUser?.ai_base_url);
 
     // 实时计算结果
     const calculateSchedule = () => {
@@ -139,6 +142,15 @@ const TeachingPlanGenerate: React.FC = () => {
     const handleGenerate = async () => {
         if (!course?.course_catalog) {
             message.error('请先在课程详情页编辑课程目录');
+            return;
+        }
+        if (!aiConfigured) {
+            Modal.info({
+                title: '请先配置 AI',
+                content: '生成授课计划需要先配置 AI Base URL 与 API Key。',
+                okText: '前往配置',
+                onOk: () => history.push('/profile'),
+            });
             return;
         }
 
@@ -282,6 +294,25 @@ const TeachingPlanGenerate: React.FC = () => {
                     />
                 ) : (
                     <>
+                        {!aiConfigured && (
+                            <Alert
+                                message="未配置 AI"
+                                description={
+                                    <div>
+                                        <p>生成授课计划需要先配置 AI Base URL 与 API Key。</p>
+                                        <Button
+                                            type="primary"
+                                            onClick={() => history.push('/profile')}
+                                            style={{ marginTop: 8 }}
+                                        >
+                                            前往配置
+                                        </Button>
+                                    </div>
+                                }
+                                type="warning"
+                                showIcon
+                            />
+                        )}
                         <Alert
                             message="已找到课程目录"
                             description={`将基于课程目录生成授课计划表`}
@@ -495,13 +526,13 @@ const TeachingPlanGenerate: React.FC = () => {
                                         </Form.Item>
 
                                         <Form.Item>
-                                            <Button
-                                                type="primary"
-                                                size="large"
-                                                onClick={handleGenerate}
-                                                loading={generating}
-                                                disabled={generating || !scheduleInfo.isValid}
-                                            >
+                                    <Button
+                                        type="primary"
+                                        size="large"
+                                        onClick={handleGenerate}
+                                        loading={generating}
+                                        disabled={generating || !scheduleInfo.isValid || !aiConfigured}
+                                    >
                                                 {generating
                                                     ? '生成中...'
                                                     : !scheduleInfo.isValid
