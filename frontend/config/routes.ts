@@ -95,6 +95,12 @@ export default [
     ],
   },
   {
+    path: '/papers',
+    name: 'papers',
+    icon: 'fileText',
+    component: './Paper',
+  },
+  {
     path: '/',
     redirect: '/dashboard',
   },

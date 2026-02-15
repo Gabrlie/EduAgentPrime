@@ -641,6 +641,12 @@ const TeachingPlanGenerate: React.FC = () => {
                 {documentId && fileUrl && (
                     <Card>
                         <Space>
+                            <Button
+                                type="primary"
+                                onClick={() => history.push(`/courses/${courseId}/teaching-plan/${documentId}`)}
+                            >
+                                查看/编辑授课计划
+                            </Button>
                             <Button type="primary" onClick={handleDownload}>
                                 下载 Word 文档
                             </Button>
